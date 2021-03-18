@@ -3874,6 +3874,10 @@ rconfig   real        emiss_ash_hgt       namelist,chem          1      0.      
 
 # additional namelist variables to control deposition of the organic condensable vapors
 rconfig   real        depo_fact           namelist,chem          max_domains    0.25       rh    "deposition factor for SOA vapors"      ""      ""
+# osipov parametrize fine and coarse dust fraction in the emitted size distribution (for GOCART). NOTE: that coarse mode is derived as 1 - dust_i_fraction
+rconfig   real        dust_i_fraction     namelist,chem          max_domains    0.001      rh    "fraction of the emitted dust allocated to the accumulation mode"      ""      ""
+# osipov multiplicative parameter to tune dust emissions (dust emissions *= dust_emis_sensitivity)
+rconfig   real        dust_emis_sensitivity     namelist,chem          max_domains    1.0      rh    "multiplicative parameter to tune overall dust emissions"      ""      ""
 
 # track input
 rconfig   integer    track_chem_num       namelist,chem       1               0       -    "number of track chem requested"    ""    ""

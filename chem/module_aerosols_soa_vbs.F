@@ -6861,7 +6861,8 @@ SUBROUTINE         aerosols_soa_vbs_init(chem,convfac,z_at_w,                   
     END SUBROUTINE aerosols_soa_vbs_init
 
 !
-SUBROUTINE soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,                      &
+SUBROUTINE soa_vbs_addemiss( config_flags,                                                       &
+                             id, dtstep, u10, v10, alt, dz8w, xland, chem,                      &
                              ebu,                                                               &
                              slai,ust,smois,ivgtyp,isltyp,                                      &
                              emis_ant,dust_emiss_active,                                        &
@@ -6878,6 +6879,9 @@ SUBROUTINE soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,      
 !------------------------------------------------------------------------
 
   USE module_state_description, only:  num_chem
+! osipov
+  USE module_configure, only:  grid_config_rec_type
+  TYPE(grid_config_rec_type),  INTENT(IN   )    :: config_flags
 
   INTEGER, INTENT(IN   )   ::    seasalt_emiss_active,kemit,emissopt,   &
                                  dust_emiss_active,num_soil_layers,id,  &
@@ -7145,8 +7149,10 @@ SUBROUTINE soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,      
   end if
  !     dust_opt changed to 13 since it conflicts with gocart/afwa
   if( dust_opt == 13 ) then
-   !czhao -------------------------- 
-      call soa_vbs_dust_gocartemis(                                &
+   !czhao --------------------------
+   ! osipov config_flags
+      call soa_vbs_dust_gocartemis(                               &
+           config_flags,                                          &
            ktau,dtstep,num_soil_layers,alt,u_phy,                 &
            v_phy,chem,rho_phy,dz8w,smois,u10,v10,p8w,erod,        &
            ivgtyp,isltyp,xland,dx,g,                              &
@@ -7671,7 +7677,9 @@ END SUBROUTINE soa_vbs_seasalt_emiss
 !====================================================================================
 !add another dust emission scheme following GOCART mechanism  --czhao  09/17/2009
 !====================================================================================
-  subroutine soa_vbs_dust_gocartemis (ktau,dt,num_soil_layers,alt,u_phy,    &
+! osipov add config
+  subroutine soa_vbs_dust_gocartemis (config_flags, &
+         ktau,dt,num_soil_layers,alt,u_phy,    &
          v_phy,chem,rho_phy,dz8w,smois,u10,v10,p8w,erod,                   &
          ivgtyp,isltyp,xland,dx,g,                                         &
          ids,ide, jds,jde, kds,kde,                                        &
@@ -7683,6 +7691,9 @@ END SUBROUTINE soa_vbs_seasalt_emiss
   USE module_model_constants, ONLY: mwdry
   USE module_data_mosaic_asect
   IMPLICIT NONE
+
+  ! osipov, parametrize i/c dust fraction
+  TYPE(grid_config_rec_type),  INTENT(IN   )    :: config_flags
 
    INTEGER,      INTENT(IN   ) :: ktau, num_soil_layers,           &
                                   ids,ide, jds,jde, kds,kde,               &
@@ -7728,6 +7739,16 @@ END SUBROUTINE soa_vbs_seasalt_emiss
   
   accfrac=0.07              ! assign 7% to accumulation mode
   corfrac=0.93              ! assign 93% to coarse mode
+  ! osipov, adjust the mass distribution following AQABA campaign
+  accfrac=0.001
+  corfrac=0.999              ! assign all to coarse mode
+  ! osipov use namelist to prescribe the value
+  ! TODO: check that dust_i_fraction is valid, i.e. in [0,1]
+  accfrac=config_flags%dust_i_fraction
+  corfrac = 1.0-accfrac
+!  write(22,*) 'accfrac=', accfrac
+!  write(22,*) 'corfrac=', corfrac
+
   rscale1=1.00  ! to account for the dust larger than 10um in radius
   rscale2=1.02  ! to account for the dust larger than 10um in radius
   accfrac=accfrac*rscale1
@@ -7771,7 +7792,7 @@ END SUBROUTINE soa_vbs_seasalt_emiss
 
     call soa_vbs_source_du( nmx, dt,i,j, &
                             erodin, ilwi, dxy, w10m, gwet, airden, airmas, &
-                            bems,start_month,g)
+                            bems,start_month,g,config_flags%dust_emis_sensitivity)  ! osipov, add parameter to tune emissions
 
 !bems: kg/timestep/cell
     !sum up the dust emission from 0.1-10 um in radius 
@@ -7804,7 +7825,7 @@ end subroutine soa_vbs_dust_gocartemis
 
   SUBROUTINE soa_vbs_source_du( nmx, dt1,i,j, &
                      erod, ilwi, dxy, w10m, gwet, airden, airmas, &
-                     bems,month,g0)
+                     bems,month,g0,dust_emis_sensitivity)
 
 ! ****************************************************************************
 ! *  Evaluate the source of each dust particles size classes  (kg/m3)        
@@ -7842,6 +7863,7 @@ end subroutine soa_vbs_dust_gocartemis
   REAL*8    :: den(nmx), diam(nmx)
   REAL*8    :: tsrc, u_ts0, cw, u_ts, dsrc, srce
   REAL, intent(in)    :: g0
+  REAL, intent(in)    :: dust_emis_sensitivity
   REAL    :: rhoa, g,dt1
   INTEGER :: i, j, n, m, k
 
@@ -7850,6 +7872,12 @@ end subroutine soa_vbs_dust_gocartemis
    ch_dust(:,:)=1.0D-9  ! default 
   !ch_dust(:,:)=0.65D-9   ! ch_dust is tuned to match MODIS and AERONET measurements over Sahara 
   !ch_dust(:,:)=1.0D-9*0.36  ! ch_dust is scaled to soa_vbs total dust emission
+
+  ! osipov scale default emissions using namelist
+  ch_dust(:,:) = ch_dust(:,:) * dust_emis_sensitivity
+
+  !write(22,*) 'dust_emis_sensitivity=',dust_emis_sensitivity
+  !write(22,*) 'ch_dust=',ch_dust
 
   ! executable statemenst
   DO n = 1, nmx

@@ -375,7 +375,9 @@ CONTAINS
 !           
 ! osipovs, add the deposition diagnostics for RADM2 SORGAM cases
 ! //TODO: check carefully the list of tracers, should match the registry.chem
-! 
+!
+! osipov debug this code should be removed
+!# if 0
            if( config_flags%diagnostic_chem == DEPVEL1 .and. &
               config_flags%chem_opt == RADM2SORG_KPP ) then
                do j = jts,jte
@@ -388,6 +390,7 @@ CONTAINS
                   dvel(its:ite,1,j,p_dvel_hno3) = m2cm*ddvel(its:ite,j,p_hno3)
                 enddo
           endif
+!# endif
 
        ELSEIF ( config_flags%chem_opt == GOCART_SIMPLE ) then
           call wesely_driver(id,ktau,dtstep,                              &
@@ -465,7 +468,7 @@ CONTAINS
        if( config_flags%diagnostic_dep == 1) then
        do i = its, ite
        do j = jts, jte
-       ddflx(i, j,1:numgas)=ddflx(i,j,1:numgas)+chem(i,kts,j,1:numgas)*p_phy(i,kts,j)/(RSI*t_phy(i,kts,j))*ddvel(i,j,1:numgas)*dtstep*1.E-6
+       ddflx(i,j,1:numgas)=ddflx(i,j,1:numgas)+chem(i,kts,j,1:numgas)*p_phy(i,kts,j)/(RSI*t_phy(i,kts,j))*ddvel(i,j,1:numgas)*dtstep*1.E-6
        enddo
        enddo
        end if

@@ -1495,7 +1495,9 @@ CONTAINS
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     CASE (RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP,RACM_SOA_VBS_HET_KPP)
        call wrf_debug(15,'emissions_driver calling soa_vbs_addemiss')
-       call soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,  &
+       ! osipov config_flags
+       call soa_vbs_addemiss(config_flags,                              &
+            id, dtstep, u10, v10, alt, dz8w, xland, chem,  &
             ebu,                                                        &
             slai,ust,smois,ivgtyp,isltyp,                               &
             emis_ant,dust_emiss_active,                                 &
