@@ -37,10 +37,10 @@ MODULE module_data_soa_vbs
 !mh    are species which are deposited with the same rate
 
       INTEGER laerdvc, lnonaerdvc, l1ae, laero, imodes, aspec
-!liqy
-       PARAMETER (laerdvc=46,lnonaerdvc=17+lspcv)
-!liqy-20140912
-!      PARAMETER (laerdvc=39,lnonaerdvc=8+lspcv)
+
+       PARAMETER (laerdvc=46,lnonaerdvc=18+lspcv) ! osipov, add aerosol ph
+!       PARAMETER (laerdvc=46,lnonaerdvc=17+lspcv) ! liqy
+!      PARAMETER (laerdvc=39,lnonaerdvc=8+lspcv)  !liqy-20140912
       PARAMETER (l1ae=laerdvc+lnonaerdvc)
       PARAMETER (laero=4,imodes=4,aspec=1)
 !     LAERDVC  number of advected aerosol dynamic parameters for a given
@@ -337,6 +337,9 @@ INTEGER, PARAMETER :: vcvbsoa3=70
 INTEGER, PARAMETER :: vcvbsoa4=71
 !liqy-20140912
 !-----------------------------------------------------------------------------
+
+!osipov, aerosol ph
+INTEGER, PARAMETER :: vph=72
 
 ! *** set up species dimension and indices for sedimentation
 !     velocity array VSED

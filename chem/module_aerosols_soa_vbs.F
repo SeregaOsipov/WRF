@@ -41,7 +41,7 @@ MODULE module_aerosols_soa_vbs
 
 CONTAINS
 
-   SUBROUTINE  soa_vbs_driver ( id,ktau,dtstep,t_phy,moist,aerwrf,p8w,  &
+   SUBROUTINE  soa_vbs_driver ( id,config_flags,ktau,dtstep,t_phy,moist,aerwrf,p8w,  &
                t8w,alt,p_phy,chem,rho_phy,dz8w,rh,z,z_at_w,             & 
 !liqy
               gamn2o5,cn2o5,kn2o5,yclno2,snu,sac,                       &
@@ -49,13 +49,13 @@ CONTAINS
                h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3,               &
                vcsulf_old,                                              &
                vdrog3,                                                  &
-               kemit,brch_ratio,                                        &
+               kemit,brch_ratio,ph,                                     &  ! osipov, ph
                ids,ide, jds,jde, kds,kde,                               &
                ims,ime, jms,jme, kms,kme,                               &
                its,ite, jts,jte, kts,kte                                )
 
-!   USE module_configure, only: grid_config_rec_type
-!   TYPE (grid_config_rec_type), INTENT (in) :: config_flags
+   USE module_configure, only: grid_config_rec_type
+   TYPE (grid_config_rec_type), INTENT (in) :: config_flags
 
    INTEGER, INTENT(IN   )  ::         ids,ide, jds,jde, kds,kde, &
                                       ims,ime, jms,jme, kms,kme, &
@@ -78,7 +78,7 @@ CONTAINS
            h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3
 
    REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),                       &
-         INTENT(INOUT ) ::    brch_ratio 
+         INTENT(INOUT ) ::    brch_ratio, ph                     ! osipov, ph
 
 !           cvasoa1,cvasoa2,    &
 !           cvasoa3,cvasoa4,cvbsoa1,cvbsoa2,cvbsoa3,cvbsoa4
@@ -347,6 +347,7 @@ INTEGER :: i,j,k,l,debug_level
         cblk(1,VAC3     ) =   max(epsilc,ac3(i,k,j))
 
         cblk(1,VCOR3    ) =   max(epsilc,cor3(i,k,j))
+        cblk(1,vph) = max(epsilc,ph(i,k,j))  ! osipov, use min(20, ph) here?
 !liqy
         cblk(1,vgamn2o5) = max(epsilc,gamn2o5(i,k,j))
         cblk(1,vcn2o5)   = max(epsilc,cn2o5(i,k,j))
@@ -413,7 +414,8 @@ INTEGER :: i,j,k,l,debug_level
 ! condvap_in is removed
       CALL rpmmod3(nspcsda,blksize,k,dtstep,10.*p(k),t(k),rh0(k),nitrate_in,nh3_in, &
         vsulf_in,so4rat_in,drog_in,ldrog_vbs,ncv,nacv,eeci_in,eecj_in, &
-        eorgi_in,eorgj_in,epm25i,epm25j,epmcoarse,soilrat_in,cblk,i,j,k,brrto)
+        eorgi_in,eorgj_in,epm25i,epm25j,epmcoarse,soilrat_in,cblk,i,j,k,brrto, &
+        config_flags%do_crustal,config_flags%crustal_mobility)  ! osipov crustal effects
 
 ! calculation of brch_ratio
         brch_ratio(i,k,j)= brrto
@@ -428,8 +430,6 @@ INTEGER :: i,j,k,l,debug_level
         chem(i,k,j,p_naaj)  = cblk(1,VNAAJ   )
         chem(i,k,j,p_naai)  = cblk(1,VNAAI   )
 !liqy
-!uncomment chem(i,k,j,p_claj) = cblk(1,VCLAJ   )
-!uncomment chem(i,k,j,p_clai) = cblk(1,VCLAI   )
         chem(i,k,j,p_claj) = cblk(1,VCLAJ   )
         chem(i,k,j,p_clai) = cblk(1,VCLAI   )
 
@@ -494,6 +494,8 @@ INTEGER :: i,j,k,l,debug_level
       nu3(i,k,j) = cblk(1,VNU3     )
       ac3(i,k,j) = cblk(1,VAC3     )
       cor3(i,k,j) = cblk(1,VCOR3    )
+
+      ph(i,k,j)= cblk(1,vph)  ! osipov, ph
 !liqy
        gamn2o5(i,k,j)= cblk(1,vgamn2o5)
        cn2o5(i,k,j)  = cblk(1,vcn2o5)
@@ -1411,7 +1413,8 @@ SUBROUTINE aeroproc(blksize,nspcsda,numcells,layer,cblk,dt,blkta,blkprs, &
     epm25j,eorgi,eorgj,eeci,eecj,epmcoarse,esoil,eseas,xlm,amu,dgnuc, &
     dgacc,dgcor,pmassn,pmassa,pmassc,pdensn,pdensa,pdensc,knnuc,knacc, &
     kncor,fconcn,fconca,fconcn_org,fconca_org,dmdt,dndt,cgrn3,cgra3,urn00, &
-    ura00,brna01,c30,deltaso4a,igrid,jgrid,kgrid,brrto)
+    ura00,brna01,c30,deltaso4a,igrid,jgrid,kgrid,brrto, &
+    do_crustal,crustal_mobility)  ! osipov do_crustal
 
 !USE module_configure, only: grid_config_rec_type
 !TYPE (grid_config_rec_type), INTENT (in) :: config_flags
@@ -1581,6 +1584,10 @@ SUBROUTINE aeroproc(blksize,nspcsda,numcells,layer,cblk,dt,blkta,blkprs, &
       PARAMETER (unit=20)
       integer igrid,jgrid,kgrid,isorop
 
+      ! osipov namelist switch
+      logical do_crustal
+      real crustal_mobility
+
 !liqy
       isorop=1
 
@@ -1588,9 +1595,9 @@ SUBROUTINE aeroproc(blksize,nspcsda,numcells,layer,cblk,dt,blkta,blkprs, &
 !     for now, don't call if temp is below -40C (humidity
 !     for this wrf version is already limited to 10 percent)
         if(blkta(1).ge.233.15.and.blkrh(1).ge.0.1 .and. isorop.eq.1)then
-            CALL eql3(blksize,nspcsda,numcells,cblk,blkta,blkrh)
+            CALL eql3(blksize,nspcsda,numcells,cblk,blkta,blkrh,do_crustal,crustal_mobility)
         else if (blkta(1).ge.233.15.and.blkrh(1).ge.0.1 .and. isorop.eq.0)then
-           CALL eql4(blksize,nspcsda,numcells,cblk,blkta,blkrh)
+            CALL eql4(blksize,nspcsda,numcells,cblk,blkta,blkrh)
         endif
 
         CALL n2o5het(blksize,nspcsda,numcells,dt,cblk,blkta,blkrh,dgnuc,dgacc,dgcor,igrid,jgrid,kgrid)
@@ -2921,7 +2928,7 @@ END SUBROUTINE coagrate
 !liqy
 !    Calculate the aerosol chemical speciation and water content.
 ! cubic
-    SUBROUTINE eql3(blksize,nspcsda,numcells,cblk,blkta,blkrh)
+    SUBROUTINE eql3(blksize,nspcsda,numcells,cblk,blkta,blkrh,do_crustal,crustal_mobility)  ! osipov
 !***********************************************************************
 !**    DESCRIPTION:
 !	Calculates the distribution of ammonia/ammonium, nitric acid/nitrate,
@@ -2935,6 +2942,7 @@ END SUBROUTINE coagrate
 !                 and collect met variable stmt funcs in one include fil
 !       Revised 7/26/96 by FSB to use block concept.
 !       Revise 12/1896 to do do i-mode calculation.
+!       Revised 16/07/2021 osipov added ph
 !**********************************************************************
 !     IMPLICIT NONE
 
@@ -2950,8 +2958,9 @@ END SUBROUTINE coagrate
 ! main array of variables         
       REAL blkta(blksize) ! Air temperature [ K ]                   
       REAL blkrh(blksize) ! Fractional relative humidity            
+      REAL HPLUSTEMP  ! osipov ph, ! AEROPH: Temporary variable for pH (hotp 8/11/09)
 
-      INTEGER lcell ! loop counter                                   
+      INTEGER lcell ! loop counter
 ! air temperature                             
       REAL temp
 !iamodels3
@@ -2996,6 +3005,7 @@ END SUBROUTINE coagrate
       REAL dgacc(blksize) ! accumulation geometric mean diamet
       REAL dgcor(blksize)
       REAL dtstep
+
 
 !intmw AERLIQ Name  
 !       1       1       H+
@@ -3044,6 +3054,13 @@ END SUBROUTINE coagrate
         character*5 zone
         integer*4  values(8)
 
+        ! osipov, temp
+        real fracna, fracca, frack,  fracmg  ! osipov fractions for the crustal species
+        real fracsoila  ! the fraction of the dust (dust = emission - crustal)
+
+        ! osipov, dust crustal effects
+        logical do_crustal  ! acticates the effects
+        real crustal_mobility  ! fraction of the dust cations that are mobilized
 
       DO lcell = 1,numcells
 ! equilibrium for the fine mode.          
@@ -3056,7 +3073,7 @@ END SUBROUTINE coagrate
         WI(1) = DBLE(((cblk(lcell,vnaaj)  + cblk(lcell,vnaai)) &
                    /22.99)*1.e-6)      ! sodium
 
-        WI(2) = DBLE(  &
+        WI(2) = DBLE(  &  ! osipov, h2so4 is missing here! add vsulf
                 ((cblk(lcell,vso4aj) +  cblk(lcell,vso4ai)) &
                          /96.061)*1.e-6)       ! sulfate
 
@@ -3081,11 +3098,28 @@ END SUBROUTINE coagrate
         WI(8) = DBLE((cblk(lcell,vmgaj)  + cblk(lcell,vmgai)) &
                    /24.305*1.e-6) !magnesium
 
+        ! osipov include the effect of crustal material from dust. Emissions are only implemented for MOSAIC
+        fracna = 0.0236
+        fracca = 0.0385
+        frack = 0.0214
+        fracmg = 0.022
+        fracsoila=1.0-fracna-fracca-frack-fracmg
+        ! Temporarily solution
+
+        if (do_crustal) then
+            ! should include the dust from accumulation mode, vp25aj, but it is mixed with primary aerosols
+            ! I prescribed 0 fraction for j-dust in the namelist, so ignore for now (only c-dust)
+            WI(1) = WI(1)+DBLE(((cblk(lcell,vsoila)*crustal_mobility*fracna)/22.99)*1.e-6)      ! sodium
+            WI(6) = WI(6)+DBLE((cblk(lcell,vsoila)*crustal_mobility*fracca) /40.078*1.e-6) !calcium
+            WI(7) = WI(7)+DBLE((cblk(lcell,vsoila)*crustal_mobility*frack)  /39.098*1.e-6) !potassium
+            WI(8) = WI(8)+DBLE((cblk(lcell,vsoila)*crustal_mobility*fracmg) /24.305*1.e-6) !magnesium
+        endif
 
                 CNTRL(1) = DBLE(0.) ! 0=FORWARD PROBLEM, 1=REVERSE PROBLEM 
                 CNTRL(2) = DBLE(1.) ! 0=SOLID+LIQUID AEROSOL, 1=METASTABLE 
 
                 CALL ISOROPIA2p1 (WI, RHI, TEMPI, CNTRL, &
+                        !WT, GAS, H, AERSLD, SCASE, OTHER)  ! osipov AERLIQ is lost here and does not update water
                         WT, GAS, AERLIQ, AERSLD, SCASE, OTHER)
 
 !****************************************************************************        
@@ -3099,16 +3133,28 @@ END SUBROUTINE coagrate
 
                         aso4 = real(wt(2)*DBLE(96.061)*1.D6) ! in ug/m3
 
+                        ! osipov debug
+                        !print *, 'osipov AERLIQ(8)',AERLIQ(8)
                         ah2o = real(AERLIQ(8)*DBLE(18.015)*1.D6) !H2O
                         ana = real(wt(1)*DBLE(22.99)*1.D6)
                         aca = real(wt(6)*DBLE(40.078)*1.D6)
                         ak  = real(wt(7)*DBLE(39.098)*1.D6)
                         amg = real(wt(8)*DBLE(24.305)*1.D6)
+
+                        !osipov compute pH
+                        if (OTHER(1) .ge. 0.5) THEN ! e.g. 1 is dry, 0 is wet
+                           cblk(lcell,vph) = 20.0  ! Aerosol is dry so HPLUSTEMP and PH are undefined, force ph to 20
+                        ELSE
+                            HPLUSTEMP = AERLIQ(1) / AERLIQ(8) * 1.0e+3 / 18.0
+                            ! Use SAFELOG10 to prevent NAN
+                            cblk(lcell,vph)=-1.0*LOG10(HPLUSTEMP)  ! SAFELOG10 would be better
+                        ENDIF
+
 !****************************************************************************
 !****************************************************************************        
 ! *** the following is an interim procedure. Assume the i-mode has the
 !     same relative mass concentrations as the total mass. Use SO4 as
-!     the surrogate. 
+!     the surrogate.
 
 ! *** get modal fraction
         fraci = cblk(lcell,vso4ai)/(cblk(lcell,vso4aj)+cblk(lcell,vso4ai))
@@ -3120,11 +3166,13 @@ END SUBROUTINE coagrate
         cblk(lcell,vh2oai) = fraci*ah2o
         cblk(lcell,vnh4ai) = fraci*anh4
         cblk(lcell,vno3ai) = fraci*ano3
-        cblk(lcell,vnaai) = fraci*ana
         cblk(lcell,vclai) = fraci*acl
-        cblk(lcell,vcaai) = fraci*aca
-        cblk(lcell,vkai) = fraci*ak
-        cblk(lcell,vmgai) = fraci*amg
+        if (.not. do_crustal) then  ! default behaviour
+            cblk(lcell,vnaai) = fraci*ana  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+            cblk(lcell,vcaai) = fraci*aca  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+            cblk(lcell,vkai) = fraci*ak  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+            cblk(lcell,vmgai) = fraci*amg  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+        endif
 
 ! *** update accumulation mode:
         cblk(lcell,vso4aj) = fracj*aso4
@@ -3132,11 +3180,13 @@ END SUBROUTINE coagrate
         cblk(lcell,vh2oaj) = fracj*ah2o
         cblk(lcell,vnh4aj) = fracj*anh4
         cblk(lcell,vno3aj) = fracj*ano3
-        cblk(lcell,vnaaj) = fracj*ana
         cblk(lcell,vclaj) = fracj*acl
-        cblk(lcell,vcaaj) = fracj*aca
-        cblk(lcell,vkaj) = fracj*ak
-        cblk(lcell,vmgaj) = fracj*amg
+        if (.not. do_crustal) then  ! default behaviour
+             cblk(lcell,vnaaj) = fracj*ana  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+             cblk(lcell,vcaaj) = fracj*aca  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+             cblk(lcell,vkaj) = fracj*ak  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+             cblk(lcell,vmgaj) = fracj*amg  ! osipov do not update concentrations for now, they do not change TODO: fix me properly
+         endif
 
 ! *** update gas / vapor phase
         cblk(lcell,vnh3) = gnh3
@@ -3790,7 +3840,7 @@ END SUBROUTINE klpnuc
 !liqy
                   cafac*cblk(lcell,vcaaj)+  kfac*cblk(lcell,vkaj) + &
                   mgfac*cblk(lcell,vmgaj)+ &
-!liqy-20140616
+!liqy-20140616dust_i_fraction
           orgfac*cblk(lcell, &
           vasoa1j)+orgfac*cblk(lcell,vasoa2j)+orgfac*cblk(lcell, &
           vasoa3j)+orgfac*cblk(lcell,vasoa4j)+orgfac*cblk(lcell, &
@@ -5135,7 +5185,7 @@ END SUBROUTINE rpmares_old
     SUBROUTINE rpmmod3(nspcsda,blksize,layer,dtsec,pres,temp,relhum, &
         nitrate_in,nh3_in,vsulf_in,so4rat_in,drog_in,ldrog_vbs,ncv, &
         nacv,eeci_in,eecj_in,eorgi_in,eorgj_in,epm25i,epm25j,epmcoarse,    &
-        soilrat_in,cblk,igrid,jgrid,kgrid,brrto)
+        soilrat_in,cblk,igrid,jgrid,kgrid,brrto,do_crustal,crustal_mobility)  ! osipov do_crustal
 
 !USE module_configure, only: grid_config_rec_type
 !TYPE (grid_config_rec_type), INTENT (in) :: config_flags
@@ -5246,7 +5296,7 @@ END SUBROUTINE rpmares_old
       INTEGER nspcsda
 
 ! number of species in CBLK ciarev02           
-      REAL cblk(blksize,nspcsda) 
+      REAL cblk(blksize,nspcsda)
 
 ! *** Meteorological information in blocked arays:
 
@@ -5256,7 +5306,7 @@ END SUBROUTINE rpmares_old
       REAL blkta(blksize) ! Air temperature [ K ]                     
       REAL blkprs(blksize) ! Air pressure in [ Pa ]                    
       REAL blkdens(blksize) ! Air density  [ kg m^-3 ]                  
-      REAL blkrh(blksize) 
+      REAL blkrh(blksize)
 
 ! *** Chemical production rates [ ug m**-3 s -1 ] :
 
@@ -5365,6 +5415,9 @@ END SUBROUTINE rpmares_old
       INTEGER ii, iimap(8)
       DATA iimap/1, 2, 18, 19, 21, 22, 23, 24/
 
+      logical do_crustal  ! osipov
+      real crustal_mobility  ! osipov
+
 !   begin body  of program box
 
 ! *** Set up files and other info
@@ -5460,7 +5513,8 @@ END SUBROUTINE rpmares_old
         nacv,epm25i,epm25j,eorgi,eorgj,eeci,eecj,epmcoarse,esoil,eseas,xlm, &
         amu,dgnuc,dgacc,dgcor,pmassn,pmassa,pmassc,pdensn,pdensa,pdensc,knnuc, &
         knacc,kncor,fconcn,fconca,fconcn_org,fconca_org,dmdt,dndt,cgrn3,cgra3, &
-        urn00,ura00,brna01,brna31,deltaso4a,igrid,jgrid,kgrid,brrto)
+        urn00,ura00,brna01,brna31,deltaso4a,igrid,jgrid,kgrid,brrto, &
+        do_crustal,crustal_mobility)  ! osipov do_crustal
 
 ! *** write output
 !      WRITE(UNIT,*) ' AFTER AEROPROC '
@@ -7736,6 +7790,8 @@ END SUBROUTINE soa_vbs_seasalt_emiss
   real dttt
   real soilfacj,rhosoilj,rhosoilc
   real totalemis,accfrac,corfrac,rscale1,rscale2
+  real fracna, fracca, frack,  fracmg  ! osipov fractions for the crustal species
+  real fracsoila  ! the fraction of the dust (dust = emission - crustal)
   
   accfrac=0.07              ! assign 7% to accumulation mode
   corfrac=0.93              ! assign 93% to coarse mode
@@ -7801,15 +7857,33 @@ END SUBROUTINE soa_vbs_seasalt_emiss
      ! to account for the particles larger than 10 um radius
      ! based on assumed size distribution
     jdustemis = totalemis*accfrac   ! accumulation mode
-    cdustemis = totalemis*corfrac   ! coarse mode 
+    cdustemis = totalemis*corfrac   ! coarse mode
 
+    ! osipov include the crustal / dust speciation. Previously only implemented for MOSAIC
+    fracna = 0.0236
+    fracca = 0.0385
+    frack = 0.0214
+    fracmg = 0.022
+    fracsoila=1.0-fracna-fracca-frack-fracmg
+    ! osipov We don't have the coarse mode for crustal species
+    ! Assume for now and put crustal material into j mode
+    ! IMPORTANT: DO NOT BREAK conservative properties
+
+    ! turn off for now
+    fracsoila=1.0
          cdustcon = sum(bems(1:5))*corfrac/airmas  ! kg/kg-dryair
          cdustcon = cdustcon * converi   ! ug/kg-dryair
          jdustcon = sum(bems(1:5))*accfrac/airmas  ! kg/kg-dryair
          jdustcon = jdustcon * converi   ! ug/kg-dryair
 
-         chem(i,k,j,p_p25j)=chem(i,k,j,p_p25j) + jdustcon
-         chem(i,k,j,p_soila)=chem(i,k,j,p_soila) + cdustcon
+          chem(i,k,j,p_p25j)=chem(i,k,j,p_p25j) + jdustcon*fracsoila
+          chem(i,k,j,p_soila)=chem(i,k,j,p_soila) + cdustcon*fracsoila
+
+!        chem(i,k,j,p_naaj)=chem(i,k,j,p_naaj) + jdustcon*fracsoila
+!        chem(i,k,j,p_caaj)=chem(i,k,j,p_caaj) + cdustcon*fracsoila
+!        chem(i,k,j,p_kaj)=chem(i,k,j,p_kaj) + jdustcon*fracsoila
+!        chem(i,k,j,p_mgaj)=chem(i,k,j,p_mgaj) + cdustcon*fracsoila
+
 
 ! czhao doing dust number emission following pm10
 ! use soilfacj for accumulation mode because GOCART assign a less dense dust in

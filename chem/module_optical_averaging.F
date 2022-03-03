@@ -2182,6 +2182,7 @@ COMPLEX, DIMENSION( its:ite, kts:kte, jts:jte,1:nbin_o,nswbands),      &
         l=numptr_aer(isize,itype,iphase)
         if (l .ge. p1st)  num_ac= chem(i,k,j,l)*conv1b
 
+        ! TODO: osipov, K (potassium) is missing here
 
         vol_ai = (mass_so4i/dens_so4) + (mass_no3i/dens_no3)  + &
                  (mass_nh4i/dens_nh4) + (mass_oini/dens_oin)  + &

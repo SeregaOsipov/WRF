@@ -203,6 +203,9 @@ CONTAINS
    integer :: k_a, k_c, kmax, m_mam
    real, dimension( its:ite, jts:jte ) :: frac_removed
 
+   ! osipov add temproray aerosol indexer for for-loop
+   integer :: p_aer
+
 
 ! ..
 ! .. Intrinsic Functions ..
@@ -637,6 +640,25 @@ CONTAINS
              ddvel(:,:,numgas+1:num_chem) = min( 0.50, ddvel(:,:,numgas+1:num_chem) )
           end if
        end if
+
+       ! osipov, Add deposition diags for sorgam case. Calculations for gases are above
+       if( config_flags%diagnostic_dep == 1 .and.  &
+         config_flags%chem_opt == RACM_SOA_VBS_HET_KPP) then
+            ! diags for the surface level
+            k=kts
+            ! osipov, in principle this can be shorted via ddvel(:,:,numgas+1:num_chem)
+            ! print *,'osipov numgas=',numgas, ' num_chem=', num_chem, ' p_soila=', p_soila
+            do p_aer = numgas+1, num_chem  ! borrow variable from mam
+                ddflx(its:ite,jts:jte,p_aer)=ddflx(its:ite,jts:jte,p_aer)+chem(its:ite,k,jts:jte,p_aer)/alt(its:ite,k,jts:jte)*ddvel(its:ite,jts:jte,p_aer)*dtstep
+            enddo
+            ! or do everything by hand, see module_aerosols_sorgam.F
+!           ddflx(i,j,p_so4aj)=ddflx(i,j,p_so4aj)+chem(i,k,j,p_so4aj)/alt(i,k,j)*ddvel(i,j,VSO4AJ)*dtstep
+!           ddflx(i,j,p_so4ai)=ddflx(i,j,p_so4ai)+chem(i,k,j,p_so4ai)/alt(i,k,j)*ddvel(i,j,VSO4AI)*dtstepn of MPI call statistics,
+!           ...
+!           ddflx(i,j,p_nu0)=ddflx(i,j,p_nu0)+chem(i,k,j,p_nu0)/alt(i,k,j)*ddvel(i,j,VNU0)*dtstep
+!           ddflx(i,j,p_ac0)=ddflx(i,j,p_ac0)+chem(i,k,j,p_ac0)/alt(i,k,j)*ddvel(i,j,VAC0)*dtstep
+!           ddflx(i,j,p_corn)=ddflx(i,j,p_corn)+chem(i,k,j,p_corn)/alt(i,k,j)*ddvel(i,j,VCORN)*dtstep
+        end if
 
        !For MAM aersols dry deposition
        if ((aer_mech_id == 4)) then

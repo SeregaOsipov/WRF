@@ -154,11 +154,19 @@
 
       use module_xsections, only : rdxs_init
 
+      !osipov fix serialization issue
+      #if defined(DM_PARALLEL) && !defined(STUBMPI)
+          INCLUDE "mpif.h"
+      #endif
+
       integer, intent(in) :: nw
       real, intent(in)    :: wl(nw)
 
       integer :: astat, m, n
       character(len=256) :: emsg
+
+      ! osipov, solve serialization problem
+      integer :: my_mpi_id, ierr
 
       call set_initialization( status=.true. )
 
@@ -200,7 +208,11 @@
       npht_tab = 2
       call setup_sub_calls( the_subs,npht_tab )
 
-      call diagnostics
+      ! osipov call diagnostics only once (serial process), otherwise the job is hanging on large number of processes
+      call MPI_COMM_RANK (MPI_COMM_WORLD, my_mpi_id, ierr)
+      if (my_mpi_id .eq. 0 ) then
+        call diagnostics
+      endif
 
       call rdxs_init( nw, wl )
 
