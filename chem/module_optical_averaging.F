@@ -1147,7 +1147,7 @@
       dlo_um=0.0390625
       dhi_um=10.0
       drydens=1.8
-      iflag=2
+      iflag=3  ! osipov, new iflag is setup to compute factors for normalized input
       duma=1.0
       dgmin=1.0e-07 ! in (cm)
       dtemp=dlo_um
@@ -1689,10 +1689,8 @@
 !            RACM_SOA_VBS_KPP aerosol model 
 
 ! This subroutine computes volume-averaged refractive index and wet radius
-! needed 
-! by the mie calculations. Aerosol number is also passed into the mie
-! calculations
-! in terms of other units.
+! needed by the mie calculations. Aerosol number is also passed into the mie
+! calculations in terms of other units.
 !
   subroutine optical_prep_modal_soa_vbs(nbin_o, chem, alt,           &
 !       h2oai, h2oaj, refindx, radius_wet, number_bin,           &
@@ -1815,7 +1813,7 @@ COMPLEX, DIMENSION( its:ite, kts:kte, jts:jte,1:nbin_o,nswbands),      &
       dlo_um=0.0390625
       dhi_um=10.0
       drydens=1.8
-      iflag=2
+      iflag=3  ! osipov, new iflag is setup to compute factors for normalized input
       duma=1.0
       dgmin=1.0e-07 ! in (cm)
       dtemp=dlo_um
@@ -2150,6 +2148,7 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
         l=numptr_aer(isize,itype,iphase)
         if (l .ge. p1st)  num_ac= chem(i,k,j,l)*conv1b
 
+        ! TODO: osipov, K (potassium) is missing here
 
         vol_ai = (mass_so4i/dens_so4) + (mass_no3i/dens_no3)  + &
                  (mass_nh4i/dens_nh4) + (mass_oini/dens_oin)  + &
@@ -2214,6 +2213,8 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
 !jdfcz    mass_dust= mass_dusti*xmas_secti(isize) + mass_dustj*xmas_sectj(isize)
 !+ &
 !jdfcz               mass_soil*xmas_sectc(isize)
+!osipov coarse dust mass (soil) was lost resulting in the wrong wet radius and size parameter for Mie
+          mass_dust = mass_soil*xmas_sectc(isize)
           !mass_oc = (mass_pai+mass_aro1i+mass_aro2i+mass_alk1i+mass_ole1i+ &
           !           mass_ba1i+mass_ba2i+mass_ba3i+mass_ba4i)*xmas_secti(isize)
           !           + &
@@ -2232,6 +2233,8 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
           vol_nh4 = mass_nh4 / dens_nh4
           vol_oin = mass_oin / dens_oin
 !jdfcz    vol_dust = mass_dust / dens_dust
+! osipov, fix the missing soila
+          vol_dust = mass_dust / dens_dust
           vol_oc  = mass_oc  / dens_oc
           vol_bc  = mass_bc  / dens_bc
           vol_na  = mass_na  / dens_na
@@ -2251,16 +2254,17 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
 !!$            print*,'h2o',mass_h2o,vol_h2o
 !!$          endif
           mass_dry_a = mass_so4 + mass_no3 + mass_nh4 + mass_oin + &
-!jdfcz                 mass_oc  + mass_bc  + mass_na  + mass_cl  + mass_dust
-                       mass_oc  + mass_bc  + mass_na  + mass_cl
+! osipov bring back (uncomment) the coarse dust
+                       mass_oc  + mass_bc  + mass_na  + mass_cl  + mass_dust
+!                       mass_oc  + mass_bc  + mass_na  + mass_cl
           mass_wet_a = mass_dry_a + mass_h2o
           vol_dry_a  = vol_so4  + vol_no3  + vol_nh4  + vol_oin  + &
-!jdfcz                 vol_oc   + vol_bc   + vol_na   + vol_cl   + vol_dust
-                       vol_oc   + vol_bc   + vol_na   + vol_cl
+! osipov bring back (uncomment) the coarse dust
+                       vol_oc   + vol_bc   + vol_na   + vol_cl   + vol_dust
+!                       vol_oc   + vol_bc   + vol_na   + vol_cl
           vol_wet_a  = vol_dry_a + vol_h2o
           vol_shell  = vol_wet_a - vol_bc
-          !num_a      = vol_wet_a /
-          !(0.52359877*xdia_cm(isize)*xdia_cm(isize)*xdia_cm(isize))
+          !num_a      = vol_wet_a /(0.52359877*xdia_cm(isize)*xdia_cm(isize)*xdia_cm(isize))
           !czhao 
           num_a      = num_ai*xnum_secti(isize)+num_aj*xnum_sectj(isize)+num_ac*xnum_sectc(isize)
 
@@ -2274,6 +2278,8 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
 !jdf                   (ref_index_oin    * mass_oin / dens_oin) +  &
 !jdfcz                 (swref_index_dust(ns)   * mass_dust / dens_dust) +  &
                        (swref_index_dust(ns)   * mass_oin / dens_dust)  +  &
+! osipov coarse dust (oin is dust from p25j, this is soila contribution)
+                       (swref_index_dust(ns)   * mass_dust / dens_dust)  +  &
                        (swref_index_oc(ns)     * mass_oc  / dens_oc) +   &
                        (ref_index_bc     * mass_bc  / dens_bc) +   &
 
@@ -2301,6 +2307,8 @@ if (l .ge. p1st)  mass_asoa2j= chem(i,k,j,l)*conv1a
 !jdf                   (ref_index_oin    * mass_oin / dens_oin) +  &
 !jdfcz                 (swref_index_dust(ns)   * mass_dust / dens_dust) +  &
                        (swref_index_dust(ns)   * mass_oin / dens_dust)  +  &
+! osipov coarse dust (oin is dust from p25j, this is soila contribution)
+                       (swref_index_dust(ns)   * mass_dust / dens_dust)  +  &
                        (swref_index_oc(ns)     * mass_oc  / dens_oc) +   &
                        (swref_index_nacl(ns)   * mass_na  / dens_na) +   &
                        (swref_index_nacl(ns)   * mass_cl  / dens_cl) +   &
@@ -2340,6 +2348,8 @@ swrefindx(i,k,j,isize,ns)    = (1.5,0.0)
 !jdf                   (ref_index_oin    * mass_oin / dens_oin) +  &
 !jdfcz                 (lwref_index_dust(ns)    * mass_dust / dens_dust) +  &
                        (lwref_index_dust(ns)    * mass_oin / dens_dust)  +  &
+! osipov coarse dust (oin is dust from p25j, this is soila contribution)
+                       (lwref_index_dust(ns)    * mass_dust / dens_dust)  +  &
                        (lwref_index_oc(ns)     * mass_oc  / dens_oc) +   &
                        (ref_index_bc     * mass_bc  / dens_bc) +   &
                        (lwref_index_nacl(ns)   * mass_na  / dens_na) +   &
@@ -2366,6 +2376,8 @@ dp_wet_a   = xdia_cm(isize)
 !jdf                   (ref_index_oin    * mass_oin / dens_oin) +  &
 !jdfcz                 (lwref_index_dust(ns)    * mass_dust / dens_dust) +  &
                        (lwref_index_dust(ns)    * mass_oin / dens_dust)  +  &
+! osipov coarse dust (oin is dust from p25j, this is soila contribution)
+                       (lwref_index_dust(ns)    * mass_dust / dens_dust)  +  &
                        (lwref_index_oc(ns)     * mass_oc  / dens_oc) +   &
                        (lwref_index_nacl(ns)   * mass_na  / dens_na) +   &
                        (lwref_index_nacl(ns)   * mass_cl  / dens_cl) +   &
@@ -2521,7 +2533,7 @@ END subroutine optical_prep_modal_soa_vbs
       dlo_um=0.0390625
       dhi_um=10.0
       drydens=1.8
-      iflag=2
+      iflag=3  ! osipov, new iflag is setup to compute factors for normalized input
       duma=1.0
       dgmin=1.0e-07 ! in (cm)
       dtemp=dlo_um
@@ -3149,7 +3161,7 @@ END subroutine optical_prep_modal_soa_vbs
       dlo_um=0.0390625
       dhi_um=10.0
       drydens=1.8
-      iflag=2
+      iflag=3  ! osipov, new iflag is setup to compute factors for normalized input
       duma=1.0
       dgmin=1.0e-07 ! in (cm)
       dtemp=dlo_um
@@ -3673,7 +3685,7 @@ END subroutine optical_prep_modal_soa_vbs
       dlo_um=0.0390625
       dhi_um=10.0
       drydens=1.8
-      iflag=2
+      iflag=3  ! osipov, new iflag is setup to compute factors for normalized input
       duma=1.0
       dgmin=1.0e-07 ! in (cm)
       dtemp=dlo_um
@@ -4698,19 +4710,19 @@ END subroutine optical_prep_modal_soa_vbs
 ! check for refr and refi outside of lookup table range to prevent unstable extrapolation 'binterp' below
           if (refr < refrtabsw(1,ns)) then
              refr = refrtabsw(1,ns)
-             write(*,*), 'Warning: refr is smaller than lookup table range and reset to minimum bound at SW band ', ns
+!             write(*,*), 'Warning: refr is smaller than lookup table range and reset to minimum bound at SW band ', ns
           endif
           if (refr > refrtabsw(prefr,ns)) then
              refr = refrtabsw(prefr,ns)
-             write(*,*), 'Warning: refr is larger than lookup table range and reset to maximum bound at SW band ', ns
+!             write(*,*), 'Warning: refr is larger than lookup table range and reset to maximum bound at SW band ', ns
           endif
           if (refi < refitabsw(1,ns)) then
              refi = refitabsw(1,ns)
-             write(*,*), 'Warning: refi is smaller than lookup table range and reset to minimum bound at SW band ', ns
+!             write(*,*), 'Warning: refi is smaller than lookup table range and reset to minimum bound at SW band ', ns
           endif
           if (refi > refitabsw(prefi,ns)) then
              refi = refitabsw(prefi,ns)
-             write(*,*), 'Warning: refi is larger than lookup table range and reset to maximum bound at SW band ', ns
+!             write(*,*), 'Warning: refi is larger than lookup table range and reset to maximum bound at SW band ', ns
           endif
 
 ! interpolate coefficients linear in refractive index
@@ -4972,20 +4984,21 @@ END subroutine optical_prep_modal_soa_vbs
 
 ! check for refr and refi outside of lookup table range to prevent unstable extrapolation 'binterp' below
           if (refr < refrtablw(1,ns)) then
+          ! TODO: figure out why I'm hitting these warnings
              refr = refrtablw(1,ns)
-             write(*,*), 'Warning: refr is smaller than lookup table range and reset to minimum bound at LW band ', ns
+!             write(*,*), 'Warning: refr is smaller than lookup table range and reset to minimum bound at LW band ', ns
           endif
           if (refr > refrtablw(prefr,ns)) then
              refr = refrtablw(prefr,ns)
-             write(*,*), 'Warning: refr is larger than lookup table range and reset to maximum bound at LW band ', ns
+!             write(*,*), 'Warning: refr is larger than lookup table range and reset to maximum bound at LW band ', ns
           endif
           if (refi < refitablw(1,ns)) then    
              refi = refitablw(1,ns)
-             write(*,*), 'Warning: refi is smaller than lookup table range and reset to minimum bound at LW band ', ns
+!             write(*,*), 'Warning: refi is smaller than lookup table range and reset to minimum bound at LW band ', ns
           endif
           if (refi > refitablw(prefi,ns)) then
              refi = refitablw(prefi,ns)
-             write(*,*), 'Warning: refi is larger than lookup table range and reset to maximum bound at LW band ', ns
+!             write(*,*), 'Warning: refi is larger than lookup table range and reset to maximum bound at LW band ', ns
           endif
 
 ! interpolate coefficients linear in refractive index
@@ -6846,6 +6859,14 @@ END subroutine optical_prep_modal_soa_vbs
 !   user specifies a single log-normal mode and a set of section boundaries
 !   prog calculates mass and number for each section
 !
+!   osipov
+!   Logic depends on iflag
+!   iflag==1: user provided 0th moment & sg, dg. Other moments will be derived
+!   iflag==2: user provided mass (m3), m0 will be derived
+!   iflag==3: user needs just coefficients, assume that both m0 and m3 equal to 1, ignore duma
+!
+!   #TODO: iflag needs to be changed in all other optical_prep*, where they use duma=1
+!
         implicit none
         REAL, DIMENSION(nbin), INTENT(OUT) :: xnum_sect, xmas_sect
         integer iflag, n, nbin 
@@ -6859,26 +6880,37 @@ END subroutine optical_prep_modal_soa_vbs
 !       real erfc_num_recipes
         real pi
         parameter (pi = 3.1415926536)
-!
+
+! osipov
+! original code was designed to compute the mapped concentration for different input parameter duma
+! iflag 1 is for m0 or number concentration
+! iflag 2 is for m3 or mass concentration
+! remaining parameter were derived
+! czhao needed only scaling factors when both m0 and m3 are normalized to 1 (broke the iflag2 case)
+! We are going to fix original code and dedicate iflag 3 for the normalized input
         if (iflag .le. 1) then
             xntot = duma
-        else
+        else if (iflag.eq.2) then
             xmtot = duma
-            xntot = duma   !czhao
+        else
+            xvtot = 1.0
+            xmtot = 1.0
+            xntot = 1.0
         end if
 !   compute total volume and number for mode
-!       dgnum = dgnum_um*1.0e-4
-!       sx = log( sigmag )
-!       x0 = log( dgnum )
-!       x3 = x0 + 3.*sx*sx
-!       dstar = dgnum * exp(1.5*sx*sx)
-!       if (iflag .le. 1) then
-!           xvtot = xntot*(pi/6.0)*dstar*dstar*dstar
-!           xmtot = xvtot*drydens*1.0e12
-!       else
-!           xvtot = xmtot/(drydens*1.0e12)
-!           xntot = xvtot/((pi/6.0)*dstar*dstar*dstar)
-!       end if
+       dgnum = dgnum_um*1.0e-4
+       sx = log( sigmag )
+       x0 = log( dgnum )
+       x3 = x0 + 3.*sx*sx
+       dstar = dgnum * exp(1.5*sx*sx)
+       if (iflag .le. 1) then
+           xvtot = xntot*(pi/6.0)*dstar*dstar*dstar
+           xmtot = xvtot*drydens*1.0e12
+       else if (iflag.eq.2) then
+           xvtot = xmtot/(drydens*1.0e12)
+           xntot = xvtot/((pi/6.0)*dstar*dstar*dstar)
+!      else  ! do nothing
+       end if
 !   compute section boundaries
         dlo = dlo_um*1.0e-4
         dhi = dhi_um*1.0e-4
@@ -6907,12 +6939,11 @@ END subroutine optical_prep_modal_soa_vbs
         sumnum = 0.
         summas = 0.
 !       write(22,*)
-!       write(22,*) 'dgnum_um, sigmag = ', dgnum_um, sigmag
-!       write(22,*) 'drydens =', drydens
-!       write(22,*) 'ntot (#/cm3), mtot (ug/m3) = ', xntot, xmtot
+!       write(22,*) 'dgnum_um, sigmag, iflag = ', dgnum_um, sigmag, iflag
+!       write(22,*) 'drydens, dstar (cm) =', drydens, dstar
+!       write(22,*) 'ntot (#/cm3), mtot (ug/m3), vtot (cm3/cm3) = ', xntot, xmtot, xvtot
 !        write(22,9220)
-!9220    format( /   &
-!        '  n   dlo(um)   dhi(um)       number         mass' / )
+!9220    format( / '  n   dlo(um)   dhi(um)       number         mass' / )
 !9225    format(   i3, 2f10.6, 2(1pe13.4) )
 !9230    format( / 'sum over all sections  ', 2(1pe13.4) )
 !9231    format(   'modal totals           ', 2(1pe13.4) )
@@ -7070,9 +7101,11 @@ END subroutine optical_prep_modal_soa_vbs
 !
 	real,save ::rmin,rmax  ! min, max aerosol size bin
 !       data rmin /0.005e-04/   ! rmin in cm, 5e-3 microns min allowable size
-!       data rmax /50.0e-04/    ! rmax in cm. 50 microns, big particle, max allowable size
-	data rmin /0.010e-04/   ! rmin in cm, 5e-3 microns min allowable size
-	data rmax /7.0e-04/    ! rmax in cm. 50 microns, big particle, max allowable size
+	data rmin /0.010e-04/   ! rmin in cm, 10e-3 microns min allowable size
+
+! osipov, bring max size back to 50 instead of 7
+!	data rmax /7.0e-04/    ! rmax in cm. 7 microns, big particle, max allowable size
+    data rmax /50.0e-04/    ! rmax in cm. 50 microns, big particle, max allowable size
 ! diagnostic declarations
 	integer, save :: kcallmieaer2
         data  kcallmieaer2 / 0 /

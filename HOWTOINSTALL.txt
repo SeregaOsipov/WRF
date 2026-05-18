@@ -1,0 +1,88 @@
+================================================
+FIRST TIME COMPILATION on SHAHEEN or after "clean -a"
+salloc -N 1 -t 240 --mail-type=ALL --mail-user=alexander.ukhov@kaust.edu.sa
+
+# WPS
+0)
+module load grib2/1.4.0
+module load ncl/6.6.2
+module switch PrgEnv-cray PrgEnv-intel
+export NETCDF=/opt/cray/pe/netcdf/4.7.4.4/INTEL/19.1
+
+1)
+./configure
+option 19
+
+2)
+update configuration from configure.wps.backup
+
+3)
+nohup ./compile >& compile.log &
+
+
+# WRF
+0)
+module unload PrgEnv-cray
+module unload PrgEnv-intel
+module unload PrgEnv-gnu
+module load PrgEnv-intel
+module load craype-haswell
+module load cray-netcdf
+module load gcc
+
+export NETCDF=$NETCDF_DIR
+export WRFIO_NCD_LARGE_FILE_SUPPORT=1
+
+export WRF_CHEM=1
+export WRF_KPP=1
+#export YACC='/usr/bin/yacc -d'
+#export FLEX_LIB_DIR=/usr/lib64
+
+module load flex/2.6.4 bison/3.0.4
+export FLEX_LIB_DIR=${FLEX_DIR}/lib
+export YACC="${BISON_DIR}/bin/yacc -d"
+
+export JASPERLIB=/usr/lib64
+export JASPERFINC=/usr/include/jasper
+
+
+export J="-j 8"
+
+
+1)
+./configure
+option 50
+source configure <<< "50" 
+
+2) 
+compare configure.wrf with configure.wrf.bckp
+and make appropriate changes in configure.wrf
+
+3)
+nohup ./compile em_real >& compile.log &
+
+4)
+grep -i "error" ./compile.log --color
+ERROR: variable name for third body in KPP species file is expected to be  M, but was not found in cbm4 species file 
+
+- ITS OK to have this error message
+
+================================================
+COMPILATION ON SHAHEEN without KPP modifications
+
+0)
+module unload PrgEnv-cray
+module unload PrgEnv-intel
+module unload PrgEnv-gnu
+module load PrgEnv-intel
+#module load craype-haswell
+module load cray-netcdf
+module load gcc
+
+module load flex/2.6.4 bison/3.0.4
+export FLEX_LIB_DIR=${FLEX_DIR}/lib
+export YACC="${BISON_DIR}/bin/yacc -d"
+
+
+1)
+./compile em_real >& compile1.log &

@@ -1,0 +1,7 @@
+gogowrfchem
+
+./clean -a
+./configure 50 1
+
+Intel 2023 is the last version with icc. 2024 switched to icx and KPP compilation breaks
+load intel 2023 module

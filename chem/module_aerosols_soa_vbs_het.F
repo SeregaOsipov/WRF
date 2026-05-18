@@ -7729,8 +7729,9 @@ END SUBROUTINE soa_vbs_seasalt_emiss
   real soilfacj,rhosoilj,rhosoilc
   real totalemis,accfrac,corfrac,rscale1,rscale2
   
-  accfrac=0.07              ! assign 7% to accumulation mode
-  corfrac=0.93              ! assign 93% to coarse mode
+  ! osipov
+  accfrac=0.00              ! assign 7% to accumulation mode
+  corfrac=1.00              ! assign 93% to coarse mode
   rscale1=1.00  ! to account for the dust larger than 10um in radius
   rscale2=1.02  ! to account for the dust larger than 10um in radius
   accfrac=accfrac*rscale1
@@ -7853,6 +7854,9 @@ end subroutine soa_vbs_dust_gocartemis
    ch_dust(:,:)=1.0D-9  ! default 
   !ch_dust(:,:)=0.65D-9   ! ch_dust is tuned to match MODIS and AERONET measurements over Sahara 
   !ch_dust(:,:)=1.0D-9*0.36  ! ch_dust is scaled to soa_vbs total dust emission
+
+  ! osipov scale default emissions using namelist
+  ch_dust(:,:) = ch_dust(:,:) * 0.65
 
   ! executable statemenst
   DO n = 1, nmx
